@@ -68,11 +68,11 @@ const Game = () => {
   useEffect(() => {
     if (players.length >= 2 && !gameStarted) {
       if (readyPlayers.length === players.length) {
-        setMessage('All players are ready! Game will start automatically...');
+        setMessage('All players are ready! Game is starting...');
       } else if (readyPlayers.length > 0) {
-        setMessage(`${readyPlayers.length}/${players.length} players are ready.`);
+        setMessage(`${readyPlayers.length}/${players.length} players are ready. Game will start when all players are ready.`);
       } else {
-        setMessage('All players have joined! Click "Ready to Play" when you are ready.');
+        setMessage('All players have joined! Both players need to click "Ready to Play" to start the game.');
       }
     }
   }, [players, readyPlayers, gameStarted]);
@@ -97,7 +97,7 @@ const Game = () => {
         setWaitingForOpponent(false);
         if (!gameStarted) {
           setGameStatus('ready');
-          setMessage('All players have joined! Click "Ready to Play" when you are ready.');
+          setMessage('All players have joined! Both players need to click "Ready to Play" to start the game.');
         }
       }
     });
@@ -107,9 +107,9 @@ const Game = () => {
       console.log("Ready players updated:", gameReadyPlayers);
       if (!gameStarted && players.length >= 2) {
         if (gameReadyPlayers.length === players.length) {
-          setMessage('All players are ready! Game will start automatically...');
+          setMessage('All players are ready! Game is starting...');
         } else {
-          setMessage(`${gameReadyPlayers.length}/${players.length} players are ready.`);
+          setMessage(`${gameReadyPlayers.length}/${players.length} players are ready. Game will start when all players are ready.`);
         }
       }
     });

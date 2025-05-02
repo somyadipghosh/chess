@@ -111,13 +111,10 @@ io.on('connection', (socket) => {
     
     if (uniqueDevices.size >= 2 && uniqueReadyDevices.size === uniqueDevices.size && !game.started) {
       console.log(`All players are ready in game ${gameId}, starting game...`);
-      setTimeout(() => {
-        if (!game.started) {
-          game.started = true;
-          io.to(gameId).emit('game_start');
-          console.log(`Game ${gameId} started!`);
-        }
-      }, 1000);
+      // Start the game immediately when all players are ready
+      game.started = true;
+      io.to(gameId).emit('game_start');
+      console.log(`Game ${gameId} started!`);
     }
   });
   
@@ -169,20 +166,6 @@ io.on('connection', (socket) => {
     io.to(gameId).emit('player_joined', { 
       players: game.players.map(p => p.nickname) 
     });
-    
-    // If there are now 2 unique devices in the game, auto-start after a delay
-    // This gives both clients time to process the player_joined event
-    const updatedUniqueDevices = new Set(game.players.map(p => p.deviceId));
-    if (updatedUniqueDevices.size >= 2 && !game.started) {
-      console.log(`Game ${gameId} has 2 unique devices, auto-starting in 1 second...`);
-      setTimeout(() => {
-        if (!game.started) {
-          game.started = true;
-          io.to(gameId).emit('game_start');
-          console.log(`Game ${gameId} auto-started!`);
-        }
-      }, 1000);
-    }
   });
   
   // Handle starting a game (this will still work for manual starts)
