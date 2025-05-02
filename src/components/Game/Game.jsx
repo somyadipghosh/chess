@@ -62,6 +62,7 @@ const Game = () => {
     // Listen for game start
     socket.on('game_start', () => {
       setGameStarted(true);
+      setWaitingForOpponent(false); // Ensure waiting state is updated when game starts
       setGameStatus('playing');
       setMessage('The game has started! White moves first.');
     });
