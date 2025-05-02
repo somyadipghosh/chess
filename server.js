@@ -69,6 +69,7 @@ io.on('connection', (socket) => {
       players: [{nickname, deviceId, socketId: socket.id}],  // Store player with device ID and socket ID
       chess: new Chess(),
       started: false,
+      readyPlayers: [],
       moves: []
     });
     
@@ -79,6 +80,45 @@ io.on('connection', (socket) => {
     io.to(gameId).emit('player_joined', { 
       players: games.get(gameId).players.map(p => p.nickname) 
     });
+  });
+  
+  // Handle player ready status
+  socket.on('player_ready', ({ gameId, nickname, deviceId, ready }) => {
+    console.log(`Player ${nickname} (device: ${deviceId}) ready status: ${ready}`);
+    
+    const game = games.get(gameId);
+    if (!game) return;
+    
+    // Update ready players array
+    if (ready) {
+      // Add player to ready list if not already in it
+      if (!game.readyPlayers.some(p => p.deviceId === deviceId)) {
+        game.readyPlayers.push({ nickname, deviceId });
+      }
+    } else {
+      // Remove player from ready list
+      game.readyPlayers = game.readyPlayers.filter(p => p.deviceId !== deviceId);
+    }
+    
+    // Broadcast updated ready players to everyone
+    io.to(gameId).emit('player_ready', {
+      readyPlayers: game.readyPlayers.map(p => p.nickname)
+    });
+    
+    // Check if all unique players are ready to start the game
+    const uniqueDevices = new Set(game.players.map(p => p.deviceId));
+    const uniqueReadyDevices = new Set(game.readyPlayers.map(p => p.deviceId));
+    
+    if (uniqueDevices.size >= 2 && uniqueReadyDevices.size === uniqueDevices.size && !game.started) {
+      console.log(`All players are ready in game ${gameId}, starting game...`);
+      setTimeout(() => {
+        if (!game.started) {
+          game.started = true;
+          io.to(gameId).emit('game_start');
+          console.log(`Game ${gameId} started!`);
+        }
+      }, 1000);
+    }
   });
   
   // Handle joining an existing game

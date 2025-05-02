@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useGame } from '../../context/GameContext';
 
 const GameControls = ({ waitingForOpponent, gameStatus, playerColor, startGame, leaveGame }) => {
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const { isReady, toggleReady, readyPlayers, gameStarted, players } = useGame();
   
   return (
     <div className="p-6">
@@ -15,31 +17,49 @@ const GameControls = ({ waitingForOpponent, gameStatus, playerColor, startGame, 
       </h2>
       
       <div className="space-y-4">
-        {/* Start Game Button - Only shown to white player when game is ready but not started */}
-        {playerColor === 'white' && gameStatus === 'ready' && (
-          <button 
-            onClick={startGame}
-            className="w-full py-3 px-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 
-                     rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-            </svg>
-            Start Game
-          </button>
-        )}
-
-        {/* Waiting for host message - Only shown to black player when game is ready but not started */}
-        {playerColor === 'black' && gameStatus === 'ready' && (
-          <div className="w-full py-3 px-4 bg-secondary-700 border border-secondary-600 rounded-lg text-center text-gray-300 flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 animate-pulse text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" clipRule="evenodd" />
-            </svg>
-            Waiting for host to start the game...
+        {/* Ready Status Display */}
+        {!gameStarted && players.length >= 2 && (
+          <div className="mb-4">
+            <h3 className="text-gray-300 text-sm mb-2">Player Status:</h3>
+            <div className="bg-secondary-700 rounded-lg p-3 space-y-2">
+              {players.map((player, index) => (
+                <div key={index} className="flex justify-between items-center">
+                  <span>{player}</span>
+                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+                    readyPlayers.includes(player) 
+                      ? 'bg-green-800 text-green-200' 
+                      : 'bg-gray-700 text-gray-400'
+                  }`}>
+                    {readyPlayers.includes(player) ? 'Ready' : 'Not Ready'}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         
-        {/* Waiting for opponent message - Shown to host when waiting for opponent */}
+        {/* Ready Button - Only shown when not playing yet and 2 players have joined */}
+        {!gameStarted && players.length >= 2 && (
+          <button 
+            onClick={toggleReady}
+            className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center
+              ${isReady 
+                ? 'bg-gradient-to-r from-yellow-600 to-amber-500 hover:from-yellow-700 hover:to-amber-600' 
+                : 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600'}`
+            }
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              {isReady ? (
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              ) : (
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              )}
+            </svg>
+            {isReady ? 'Cancel Ready' : 'Ready to Play'}
+          </button>
+        )}
+
+        {/* Waiting for opponent message - Shown when waiting for opponent */}
         {waitingForOpponent && (
           <div className="w-full py-3 px-4 bg-secondary-700 border border-secondary-600 rounded-lg text-center text-gray-300 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 animate-pulse text-amber-400" viewBox="0 0 20 20" fill="currentColor">

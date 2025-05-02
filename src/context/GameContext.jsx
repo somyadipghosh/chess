@@ -14,6 +14,8 @@ export const GameProvider = ({ children }) => {
   const [currentPlayer, setCurrentPlayer] = useState('');
   const [gameStarted, setGameStarted] = useState(false);
   const [playerColor, setPlayerColor] = useState('');
+  const [readyPlayers, setReadyPlayers] = useState([]);
+  const [isReady, setIsReady] = useState(false);
   // Add a unique device ID to distinguish different devices
   const [deviceId] = useState(() => {
     // Try to get existing device ID from local storage
@@ -51,15 +53,12 @@ export const GameProvider = ({ children }) => {
     socket.on('player_joined', ({ players: gamePlayers }) => {
       console.log('Player joined event received:', gamePlayers);
       setPlayers(gamePlayers);
-      
-      // If there are 2 or more players and this client is the host, automatically start the game
-      if (gamePlayers.length >= 2 && playerColor === 'white' && gameId) {
-        console.log('Auto-starting game as white player');
-        // Add a small delay to ensure both clients have processed the player_joined event
-        setTimeout(() => {
-          socket.emit('start_game', { gameId });
-        }, 500);
-      }
+    });
+
+    // Listen for player ready status
+    socket.on('player_ready', ({ readyPlayers: gamePlayers }) => {
+      console.log('Ready players:', gamePlayers);
+      setReadyPlayers(gamePlayers);
     });
 
     // Listen for game start confirmation
@@ -71,9 +70,10 @@ export const GameProvider = ({ children }) => {
     // Cleanup listener when component unmounts
     return () => {
       socket.off('player_joined');
+      socket.off('player_ready');
       socket.off('game_start');
     };
-  }, [socket, playerColor, gameId]);
+  }, [socket]);
 
   // Generate a new game ID
   const createGame = () => {
@@ -97,6 +97,15 @@ export const GameProvider = ({ children }) => {
     }
   };
 
+  // Signal player ready status
+  const toggleReady = () => {
+    if (socket && gameId) {
+      const newReadyStatus = !isReady;
+      setIsReady(newReadyStatus);
+      socket.emit('player_ready', { gameId, nickname, deviceId, ready: newReadyStatus });
+    }
+  };
+
   // Handle player move
   const makeMove = (move) => {
     if (socket) {
@@ -113,6 +122,9 @@ export const GameProvider = ({ children }) => {
     setGameId,
     players,
     setPlayers,
+    readyPlayers,
+    isReady,
+    toggleReady,
     currentPlayer,
     setCurrentPlayer,
     gameStarted,

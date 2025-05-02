@@ -17,6 +17,7 @@ const Game = () => {
     nickname, 
     players, 
     setPlayers,
+    readyPlayers,
     gameStarted,
     setGameStarted,
     playerColor,
@@ -53,16 +54,34 @@ const Game = () => {
   useEffect(() => {
     if (players.length >= 2) {
       setWaitingForOpponent(false);
+      if (!gameStarted) {
+        setGameStatus('ready');
+      }
     } else {
       setWaitingForOpponent(true);
+      setGameStatus('waiting');
     }
-  }, [players]);
+  }, [players, gameStarted]);
+
+  // Update game status based on ready players
+  useEffect(() => {
+    if (players.length >= 2 && !gameStarted) {
+      if (readyPlayers.length === players.length) {
+        setMessage('All players are ready! Game will start automatically...');
+      } else if (readyPlayers.length > 0) {
+        setMessage(`${readyPlayers.length}/${players.length} players are ready.`);
+      } else {
+        setMessage('All players have joined! Click "Ready to Play" when you are ready.');
+      }
+    }
+  }, [players, readyPlayers, gameStarted]);
 
   // Update UI state when game starts
   useEffect(() => {
     if (gameStarted) {
       setWaitingForOpponent(false);
       setGameStatus('playing');
+      setMessage('The game has started! White moves first.');
     }
   }, [gameStarted]);
 
@@ -75,8 +94,22 @@ const Game = () => {
       setPlayers(gamePlayers);
       if (gamePlayers.length >= 2) {
         setWaitingForOpponent(false);
-        setGameStatus('ready');
-        setMessage('All players have joined! The game can now start.');
+        if (!gameStarted) {
+          setGameStatus('ready');
+          setMessage('All players have joined! Click "Ready to Play" when you are ready.');
+        }
+      }
+    });
+
+    // Listen for player ready status updates
+    socket.on('player_ready', ({ readyPlayers: gameReadyPlayers }) => {
+      console.log("Ready players updated:", gameReadyPlayers);
+      if (!gameStarted && players.length >= 2) {
+        if (gameReadyPlayers.length === players.length) {
+          setMessage('All players are ready! Game will start automatically...');
+        } else {
+          setMessage(`${gameReadyPlayers.length}/${players.length} players are ready.`);
+        }
       }
     });
 
@@ -109,12 +142,13 @@ const Game = () => {
     // Cleanup listeners on component unmount
     return () => {
       socket.off('player_joined');
+      socket.off('player_ready');
       socket.off('error');
       socket.off('game_start');
       socket.off('game_move');
       socket.off('game_over');
     };
-  }, [socket, setPlayers, setGameStarted]);
+  }, [socket, players, setPlayers, gameStarted, setGameStarted]);
 
   // Copy game code to clipboard
   const copyGameCode = () => {
@@ -183,6 +217,7 @@ const Game = () => {
                 gameStatus={gameStatus} 
                 message={message} 
                 playerColor={playerColor}
+                readyPlayers={readyPlayers}
               />
 
               {/* Game Controls */}
