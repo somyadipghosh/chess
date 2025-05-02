@@ -27,13 +27,19 @@ const ChessBoard = () => {
   useEffect(() => {
     if (!socket) return;
     
-    socket.on('game_move', ({ move }) => {
+    socket.on('game_move', ({ move, fen }) => {
       try {
-        setChess((prevChess) => {
-          const newChess = new Chess(prevChess.fen());
-          newChess.move(move);
-          return newChess;
-        });
+        // Use the FEN from the server to ensure all clients have the same board state
+        if (fen) {
+          setChess(new Chess(fen));
+        } else {
+          // Fallback to local move application if server doesn't provide FEN
+          setChess((prevChess) => {
+            const newChess = new Chess(prevChess.fen());
+            newChess.move(move);
+            return newChess;
+          });
+        }
         setLastMove(move);
       } catch (e) {
         console.error('Invalid move received:', e);
@@ -172,7 +178,7 @@ const ChessBoard = () => {
             data-square={square}
           >
             {piece && (
-              <span className={`chess-piece ${piece.color === 'w' ? 'white-piece' : 'black-piece'} transform hover:scale-105 transition-transform`}>
+              <span className={`chess-piece text-3xl ${piece.color === 'w' ? 'text-white' : 'text-black'}`}>
                 {piece}
               </span>
             )}
