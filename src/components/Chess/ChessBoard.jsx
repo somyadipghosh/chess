@@ -29,6 +29,9 @@ const ChessBoard = ({ latestFen }) => {
       console.log("Updating board with FEN:", latestFen);
       try {
         setChess(new Chess(latestFen));
+        // Clear selection when board updates from opponent's move
+        setSelectedSquare(null);
+        setPossibleMoves([]);
       } catch (e) {
         console.error("Invalid FEN received:", e);
       }
@@ -54,6 +57,9 @@ const ChessBoard = ({ latestFen }) => {
           });
         }
         setLastMove(move);
+        // Clear selection when receiving an opponent's move
+        setSelectedSquare(null);
+        setPossibleMoves([]);
       } catch (e) {
         console.error('Invalid move received:', e);
       }
@@ -67,16 +73,33 @@ const ChessBoard = ({ latestFen }) => {
   // Handle square click
   const handleSquareClick = (square) => {
     // Don't allow moves if the game hasn't started
-    if (!gameStarted) return;
+    if (!gameStarted) {
+      console.log("Game hasn't started yet");
+      return;
+    }
     
     // Don't allow moves if it's not the player's turn
     const currentTurn = chess.turn() === 'w' ? 'white' : 'black';
-    if (currentTurn !== playerColor) return;
+    if (currentTurn !== playerColor) {
+      console.log("Not your turn");
+      return;
+    }
     
-    // If a square is already selected, try to make a move
+    console.log(`Square clicked: ${square}`);
+    
+    // If a square is already selected
     if (selectedSquare) {
+      // If clicking the same square again, deselect it
+      if (selectedSquare === square) {
+        console.log("Deselecting square");
+        setSelectedSquare(null);
+        setPossibleMoves([]);
+        return;
+      }
+      
       // Check if the clicked square is a possible move
       if (possibleMoves.includes(square)) {
+        console.log(`Attempting move from ${selectedSquare} to ${square}`);
         try {
           const move = {
             from: selectedSquare,
@@ -87,41 +110,50 @@ const ChessBoard = ({ latestFen }) => {
           // Update local chess instance
           const newChess = new Chess(chess.fen());
           const result = newChess.move(move);
-          setChess(newChess);
           
-          // Generate algebraic notation for the move
-          const moveNotation = result.san;
-          
-          // Send move to server with notation and the new FEN
-          makeMove({ 
-            from: selectedSquare, 
-            to: square, 
-            promotion: 'q',
-            notation: moveNotation,
-            fen: newChess.fen()
-          });
-          
-          // Keep track of the last move
-          setLastMove(move);
-          
-          // Reset selection
-          setSelectedSquare(null);
-          setPossibleMoves([]);
+          if (result) {
+            setChess(newChess);
+            
+            // Generate algebraic notation for the move
+            const moveNotation = result.san;
+            
+            // Send move to server with notation and the new FEN
+            makeMove({ 
+              from: selectedSquare, 
+              to: square, 
+              promotion: 'q',
+              notation: moveNotation,
+              fen: newChess.fen()
+            });
+            
+            // Keep track of the last move
+            setLastMove(move);
+            
+            // Reset selection
+            setSelectedSquare(null);
+            setPossibleMoves([]);
+            console.log("Move completed successfully");
+          } else {
+            console.error("Invalid move");
+          }
         } catch (e) {
-          console.error('Invalid move:', e);
+          console.error('Error making move:', e);
         }
       } else {
         // Check if the clicked square contains one of the player's pieces
         const piece = chess.get(square);
         if (piece && ((piece.color === 'w' && playerColor === 'white') || 
-                     (piece.color === 'b' && playerColor === 'black'))) {
+                      (piece.color === 'b' && playerColor === 'black'))) {
+          console.log(`Selecting new piece at ${square}`);
           // Select the new square
           setSelectedSquare(square);
           // Get possible moves for the new selection
           const moves = chess.moves({ square, verbose: true });
           setPossibleMoves(moves.map(move => move.to));
+          console.log("Possible moves:", moves.map(move => move.to));
         } else {
-          // Reset selection
+          // Reset selection if clicking on an invalid square
+          console.log("Invalid square, deselecting");
           setSelectedSquare(null);
           setPossibleMoves([]);
         }
@@ -131,11 +163,15 @@ const ChessBoard = ({ latestFen }) => {
       const piece = chess.get(square);
       if (piece && ((piece.color === 'w' && playerColor === 'white') || 
                    (piece.color === 'b' && playerColor === 'black'))) {
+        console.log(`Selecting piece at ${square}`);
         // Select the square
         setSelectedSquare(square);
         // Get possible moves
         const moves = chess.moves({ square, verbose: true });
         setPossibleMoves(moves.map(move => move.to));
+        console.log("Possible moves:", moves.map(move => move.to));
+      } else {
+        console.log("No valid piece selected");
       }
     }
   };
@@ -192,7 +228,7 @@ const ChessBoard = ({ latestFen }) => {
             data-square={square}
           >
             {piece && (
-              <span className={`chess-piece text-3xl ${piece.color === 'w' ? 'text-white' : 'text-black'}`}>
+              <span className="chess-piece text-3xl" style={{ color: piece.charCodeAt(0) < 9818 ? 'white' : 'black' }}>
                 {piece}
               </span>
             )}
