@@ -29,6 +29,7 @@ const Game = () => {
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
   const [moveHistory, setMoveHistory] = useState([]);
+  const [lastFen, setLastFen] = useState(null); // Store the latest FEN position
 
   useEffect(() => {
     // Set game ID from the route parameter
@@ -128,9 +129,15 @@ const Game = () => {
     });
 
     // Listen for game moves
-    socket.on('game_move', ({ move, notation }) => {
+    socket.on('game_move', ({ move, notation, fen }) => {
+      console.log("Game move received:", notation, fen);
       // Add move to history
       setMoveHistory(prev => [...prev, notation]);
+      
+      // Store the latest FEN position
+      if (fen) {
+        setLastFen(fen);
+      }
     });
 
     // Listen for game over
@@ -239,7 +246,7 @@ const Game = () => {
           {/* Center - Chess Board */}
           <div className="lg:col-span-6">
             <div className="flex justify-center">
-              <ChessBoard />
+              <ChessBoard latestFen={lastFen} />
             </div>
           </div>
           

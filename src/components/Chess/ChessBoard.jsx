@@ -8,7 +8,7 @@ const pieces = {
   'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
 };
 
-const ChessBoard = () => {
+const ChessBoard = ({ latestFen }) => {
   const { socket, gameId, playerColor, makeMove, gameStarted } = useGame();
   const [chess, setChess] = useState(new Chess());
   const [selectedSquare, setSelectedSquare] = useState(null);
@@ -23,6 +23,18 @@ const ChessBoard = () => {
     }
   }, [playerColor]);
   
+  // Update the chess board whenever latestFen changes
+  useEffect(() => {
+    if (latestFen) {
+      console.log("Updating board with FEN:", latestFen);
+      try {
+        setChess(new Chess(latestFen));
+      } catch (e) {
+        console.error("Invalid FEN received:", e);
+      }
+    }
+  }, [latestFen]);
+  
   // Handle incoming moves from opponent
   useEffect(() => {
     if (!socket) return;
@@ -31,6 +43,7 @@ const ChessBoard = () => {
       try {
         // Use the FEN from the server to ensure all clients have the same board state
         if (fen) {
+          console.log("Move received with FEN:", fen);
           setChess(new Chess(fen));
         } else {
           // Fallback to local move application if server doesn't provide FEN
@@ -79,12 +92,13 @@ const ChessBoard = () => {
           // Generate algebraic notation for the move
           const moveNotation = result.san;
           
-          // Send move to server with notation
+          // Send move to server with notation and the new FEN
           makeMove({ 
             from: selectedSquare, 
             to: square, 
             promotion: 'q',
-            notation: moveNotation 
+            notation: moveNotation,
+            fen: newChess.fen()
           });
           
           // Keep track of the last move

@@ -207,7 +207,7 @@ io.on('connection', (socket) => {
   });
   
   // Handle a chess move
-  socket.on('make_move', ({ gameId, move, player, deviceId, notation }) => {
+  socket.on('make_move', ({ gameId, move, player, deviceId, notation, fen }) => {
     const game = games.get(gameId);
     
     if (!game || !game.started) return;
@@ -227,11 +227,17 @@ io.on('connection', (socket) => {
         deviceId
       });
       
+      // If the client sent a FEN, verify it matches the server's FEN
+      const serverFen = game.chess.fen();
+      if (fen && fen !== serverFen) {
+        console.warn(`Client FEN ${fen} differs from server FEN ${serverFen}. Using server FEN.`);
+      }
+      
       // Broadcast the move to all players in the game
       io.to(gameId).emit('game_move', { 
         move,
         notation: notation || result.san,
-        fen: game.chess.fen()
+        fen: serverFen // Always include the server's FEN position
       });
       
       // Check for game over conditions
