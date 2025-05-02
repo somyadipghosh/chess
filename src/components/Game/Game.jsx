@@ -19,7 +19,8 @@ const Game = () => {
     setPlayers,
     gameStarted,
     setGameStarted,
-    playerColor
+    playerColor,
+    deviceId
   } = useGame();
   
   const [waitingForOpponent, setWaitingForOpponent] = useState(true);
@@ -53,6 +54,11 @@ const Game = () => {
       }
     });
 
+    // Listen for errors
+    socket.on('error', ({ message }) => {
+      setMessage(`Error: ${message}`);
+    });
+
     // Listen for game start
     socket.on('game_start', () => {
       setGameStarted(true);
@@ -75,6 +81,7 @@ const Game = () => {
     // Cleanup listeners on component unmount
     return () => {
       socket.off('player_joined');
+      socket.off('error');
       socket.off('game_start');
       socket.off('game_move');
       socket.off('game_over');
@@ -92,15 +99,13 @@ const Game = () => {
   const startGame = () => {
     if (playerColor === 'white' && players.length >= 2) {
       socket.emit('start_game', { gameId });
-      setGameStarted(true);
-      setGameStatus('playing');
     }
   };
 
   // Leave the game and go back to home
   const leaveGame = () => {
     if (socket) {
-      socket.emit('leave_game', { gameId, nickname });
+      socket.emit('leave_game', { gameId, nickname, deviceId });
     }
     navigate('/');
   };

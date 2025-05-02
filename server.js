@@ -22,18 +22,32 @@ app.use(express.static(path.join(__dirname, 'dist')));
 
 // Game rooms storage
 const games = new Map();
+// Track socket connections by device ID
+const connectedDevices = new Map();
 
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
   
   // Handle creating a new game
-  socket.on('create_game', ({ gameId, nickname }) => {
-    console.log(`Game created: ${gameId} by ${nickname}`);
+  socket.on('create_game', ({ gameId, nickname, deviceId }) => {
+    console.log(`Game created: ${gameId} by ${nickname} (device: ${deviceId})`);
+    
+    // Store this socket's device ID
+    socket.data.deviceId = deviceId;
+    socket.data.nickname = nickname;
+    socket.data.gameId = gameId;
+    
+    // Map device ID to this connection
+    connectedDevices.set(deviceId, {
+      socketId: socket.id,
+      nickname,
+      gameId
+    });
     
     // Create a new game instance
     games.set(gameId, {
       id: gameId,
-      players: [nickname],
+      players: [{nickname, deviceId}],  // Store player with device ID
       chess: new Chess(),
       started: false,
       moves: []
@@ -43,11 +57,13 @@ io.on('connection', (socket) => {
     socket.join(gameId);
     
     // Notify everyone in the room about the player
-    io.to(gameId).emit('player_joined', { players: [nickname] });
+    io.to(gameId).emit('player_joined', { 
+      players: games.get(gameId).players.map(p => p.nickname) 
+    });
   });
   
   // Handle joining an existing game
-  socket.on('join_game', ({ gameId, nickname }) => {
+  socket.on('join_game', ({ gameId, nickname, deviceId }) => {
     const game = games.get(gameId);
     
     if (!game) {
@@ -55,21 +71,41 @@ io.on('connection', (socket) => {
       return;
     }
     
-    if (game.players.length >= 2) {
+    // Check if this device is already in the game
+    const deviceAlreadyInGame = game.players.some(p => p.deviceId === deviceId);
+    
+    if (game.players.length >= 2 && !deviceAlreadyInGame) {
       socket.emit('error', { message: 'Game is full' });
       return;
     }
     
-    console.log(`Player ${nickname} joined game ${gameId}`);
+    // Store this socket's info
+    socket.data.deviceId = deviceId;
+    socket.data.nickname = nickname;
+    socket.data.gameId = gameId;
     
-    // Add player to the game
-    game.players.push(nickname);
+    // Map device ID to this connection
+    connectedDevices.set(deviceId, {
+      socketId: socket.id,
+      nickname,
+      gameId
+    });
+    
+    console.log(`Player ${nickname} (device: ${deviceId}) joined game ${gameId}`);
+    
+    // Only add the player if their device isn't already in the game
+    if (!deviceAlreadyInGame) {
+      // Add player to the game
+      game.players.push({nickname, deviceId});
+    }
     
     // Join the socket to the game room
     socket.join(gameId);
     
-    // Notify everyone in the room about the new player
-    io.to(gameId).emit('player_joined', { players: game.players });
+    // Notify everyone in the room about the players
+    io.to(gameId).emit('player_joined', { 
+      players: game.players.map(p => p.nickname) 
+    });
   });
   
   // Handle starting a game
@@ -77,7 +113,13 @@ io.on('connection', (socket) => {
     const game = games.get(gameId);
     
     if (!game) return;
-    if (game.players.length < 2) return;
+    
+    // We need at least 2 unique devices to start a game
+    const uniqueDeviceCount = new Set(game.players.map(p => p.deviceId)).size;
+    if (uniqueDeviceCount < 2) {
+      socket.emit('error', { message: 'Need two different players to start the game' });
+      return;
+    }
     
     console.log(`Game ${gameId} started`);
     
@@ -88,7 +130,7 @@ io.on('connection', (socket) => {
   });
   
   // Handle a chess move
-  socket.on('make_move', ({ gameId, move, player, notation }) => {
+  socket.on('make_move', ({ gameId, move, player, deviceId, notation }) => {
     const game = games.get(gameId);
     
     if (!game || !game.started) return;
@@ -101,10 +143,11 @@ io.on('connection', (socket) => {
         promotion: move.promotion,
       });
       
-      // Store move with notation
+      // Store move with notation and device ID
       game.moves.push({
         notation: notation || result.san,
-        player
+        player,
+        deviceId
       });
       
       // Broadcast the move to all players in the game
@@ -145,32 +188,36 @@ io.on('connection', (socket) => {
   });
   
   // Handle player leaving
-  socket.on('leave_game', ({ gameId, nickname }) => {
-    leaveGame(socket, gameId, nickname);
+  socket.on('leave_game', ({ gameId, nickname, deviceId }) => {
+    leaveGame(socket, gameId, nickname, deviceId);
   });
   
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     
-    // Find and leave any games the user was part of
-    for (const [gameId, game] of games.entries()) {
-      if (game.players.includes(socket.data.nickname)) {
-        leaveGame(socket, gameId, socket.data.nickname);
-        break;
+    // Get the device ID associated with this socket
+    const deviceId = socket.data.deviceId;
+    
+    if (deviceId) {
+      const deviceInfo = connectedDevices.get(deviceId);
+      if (deviceInfo) {
+        leaveGame(socket, deviceInfo.gameId, deviceInfo.nickname, deviceId);
+        // Remove device from connected devices
+        connectedDevices.delete(deviceId);
       }
     }
   });
   
   // Helper function for leaving a game
-  function leaveGame(socket, gameId, nickname) {
+  function leaveGame(socket, gameId, nickname, deviceId) {
     const game = games.get(gameId);
     if (!game) return;
     
-    console.log(`Player ${nickname} left game ${gameId}`);
+    console.log(`Player ${nickname} (device: ${deviceId}) left game ${gameId}`);
     
     // Remove player from the game
-    const playerIndex = game.players.indexOf(nickname);
+    const playerIndex = game.players.findIndex(p => p.deviceId === deviceId);
     if (playerIndex !== -1) {
       game.players.splice(playerIndex, 1);
       
@@ -179,7 +226,7 @@ io.on('connection', (socket) => {
         // Notify remaining players
         io.to(gameId).emit('player_left', { 
           player: nickname, 
-          players: game.players 
+          players: game.players.map(p => p.nickname)
         });
         
         // If the game had already started, end it

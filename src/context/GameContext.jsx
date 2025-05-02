@@ -14,6 +14,8 @@ export const GameProvider = ({ children }) => {
   const [currentPlayer, setCurrentPlayer] = useState('');
   const [gameStarted, setGameStarted] = useState(false);
   const [playerColor, setPlayerColor] = useState('');
+  // Add a unique device ID to distinguish different devices
+  const [deviceId] = useState(uuidv4());
 
   useEffect(() => {
     // Initialize socket connection
@@ -31,7 +33,7 @@ export const GameProvider = ({ children }) => {
     const newGameId = uuidv4().substring(0, 6);
     setGameId(newGameId);
     if (socket) {
-      socket.emit('create_game', { gameId: newGameId, nickname });
+      socket.emit('create_game', { gameId: newGameId, nickname, deviceId });
       setPlayerColor('white');
     }
     return newGameId;
@@ -40,7 +42,7 @@ export const GameProvider = ({ children }) => {
   // Join an existing game
   const joinGame = (gameIdToJoin) => {
     if (socket) {
-      socket.emit('join_game', { gameId: gameIdToJoin, nickname });
+      socket.emit('join_game', { gameId: gameIdToJoin, nickname, deviceId });
       setGameId(gameIdToJoin);
       setPlayerColor('black');
     }
@@ -49,7 +51,7 @@ export const GameProvider = ({ children }) => {
   // Handle player move
   const makeMove = (move) => {
     if (socket) {
-      socket.emit('make_move', { gameId, move, player: nickname });
+      socket.emit('make_move', { gameId, move, player: nickname, deviceId });
     }
   };
 
@@ -71,6 +73,7 @@ export const GameProvider = ({ children }) => {
     createGame,
     joinGame,
     makeMove,
+    deviceId
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
