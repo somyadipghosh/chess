@@ -29,13 +29,6 @@ const Game = () => {
   const [copied, setCopied] = useState(false);
   const [moveHistory, setMoveHistory] = useState([]);
 
-  // Reset waiting state when component mounts
-  useEffect(() => {
-    if (players.length >= 2) {
-      setWaitingForOpponent(false);
-    }
-  }, []);
-
   useEffect(() => {
     // Set game ID from the route parameter
     if (routeGameId && !gameId) {
@@ -48,7 +41,15 @@ const Game = () => {
     }
   }, [routeGameId, gameId, nickname, navigate, setGameId]);
 
-  // Update waiting state whenever players list changes
+  // Join game when we have all the necessary info
+  useEffect(() => {
+    if (socket && gameId && nickname && !playerColor) {
+      // If no playerColor is set, we're joining an existing game
+      socket.emit('join_game', { gameId, nickname, deviceId });
+    }
+  }, [socket, gameId, nickname, playerColor, deviceId]);
+
+  // Update waiting state when players list changes
   useEffect(() => {
     if (players.length >= 2) {
       setWaitingForOpponent(false);
@@ -56,6 +57,14 @@ const Game = () => {
       setWaitingForOpponent(true);
     }
   }, [players]);
+
+  // Update UI state when game starts
+  useEffect(() => {
+    if (gameStarted) {
+      setWaitingForOpponent(false);
+      setGameStatus('playing');
+    }
+  }, [gameStarted]);
 
   useEffect(() => {
     if (!socket) return;
@@ -80,7 +89,7 @@ const Game = () => {
     socket.on('game_start', () => {
       console.log("Game start event received!");
       setGameStarted(true);
-      setWaitingForOpponent(false); // Ensure waiting state is updated when game starts
+      setWaitingForOpponent(false);
       setGameStatus('playing');
       setMessage('The game has started! White moves first.');
     });

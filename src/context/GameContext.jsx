@@ -27,8 +27,15 @@ export const GameProvider = ({ children }) => {
   });
 
   useEffect(() => {
+    // Determine the socket URL based on the environment
+    const socketUrl = import.meta.env.PROD 
+      ? window.location.origin  // In production, use the same origin
+      : 'http://localhost:3001'; // In development, connect to the separate server
+
+    console.log('Connecting to socket server at:', socketUrl);
+    
     // Initialize socket connection
-    const newSocket = io('https://multiplayer-chess-server.glitch.me');
+    const newSocket = io(socketUrl);
     setSocket(newSocket);
 
     // Socket cleanup on unmount

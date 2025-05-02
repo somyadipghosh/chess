@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Chess } from 'chess.js';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,8 +18,26 @@ const io = new Server(server, {
   }
 });
 
-// Serve static files from the React build
-app.use(express.static(path.join(__dirname, 'dist')));
+// Check if dist directory exists - if not, we're likely in development mode
+const distPath = path.join(__dirname, 'dist');
+const inDevelopmentMode = !fs.existsSync(distPath) || !fs.existsSync(path.join(distPath, 'index.html'));
+
+if (!inDevelopmentMode) {
+  // Serve static files from the React build in production
+  console.log('Running in production mode - serving static files from dist');
+  app.use(express.static(distPath));
+} else {
+  // In development mode - redirect to dev server or show a helpful message
+  console.log('Running in development mode - no dist folder detected');
+  app.get('/', (req, res) => {
+    res.send(`
+      <h1>Chess Multiplayer Server Running</h1>
+      <p>This is the WebSocket server running on port 3001.</p>
+      <p>In development mode, access your application at: <a href="http://localhost:3000">http://localhost:3000</a></p>
+      <p>If you intended to run in production mode, build your app with 'npm run build' first.</p>
+    `);
+  });
+}
 
 // Game rooms storage
 const games = new Map();
@@ -126,7 +145,7 @@ io.on('connection', (socket) => {
     }
   });
   
-  // Handle starting a game
+  // Handle starting a game (this will still work for manual starts)
   socket.on('start_game', ({ gameId }) => {
     const game = games.get(gameId);
     
@@ -265,12 +284,19 @@ io.on('connection', (socket) => {
   }
 });
 
-// All other GET requests not handled will return our React app
+// Handle all other GET requests
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  if (!inDevelopmentMode) {
+    // In production, serve the index.html file
+    res.sendFile(path.join(distPath, 'index.html'));
+  } else if (req.path !== '/') {
+    // In development, redirect to root for any other paths
+    res.redirect('/');
+  }
 });
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Mode: ${inDevelopmentMode ? 'Development' : 'Production'}`);
 });
