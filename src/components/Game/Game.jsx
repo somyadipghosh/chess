@@ -29,6 +29,13 @@ const Game = () => {
   const [copied, setCopied] = useState(false);
   const [moveHistory, setMoveHistory] = useState([]);
 
+  // Reset waiting state when component mounts
+  useEffect(() => {
+    if (players.length >= 2) {
+      setWaitingForOpponent(false);
+    }
+  }, []);
+
   useEffect(() => {
     // Set game ID from the route parameter
     if (routeGameId && !gameId) {
@@ -41,11 +48,21 @@ const Game = () => {
     }
   }, [routeGameId, gameId, nickname, navigate, setGameId]);
 
+  // Update waiting state whenever players list changes
+  useEffect(() => {
+    if (players.length >= 2) {
+      setWaitingForOpponent(false);
+    } else {
+      setWaitingForOpponent(true);
+    }
+  }, [players]);
+
   useEffect(() => {
     if (!socket) return;
 
     // Listen for player joining the game
     socket.on('player_joined', ({ players: gamePlayers }) => {
+      console.log("Player joined event received with players:", gamePlayers);
       setPlayers(gamePlayers);
       if (gamePlayers.length >= 2) {
         setWaitingForOpponent(false);
@@ -61,6 +78,7 @@ const Game = () => {
 
     // Listen for game start
     socket.on('game_start', () => {
+      console.log("Game start event received!");
       setGameStarted(true);
       setWaitingForOpponent(false); // Ensure waiting state is updated when game starts
       setGameStatus('playing');

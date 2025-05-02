@@ -47,7 +47,7 @@ io.on('connection', (socket) => {
     // Create a new game instance
     games.set(gameId, {
       id: gameId,
-      players: [{nickname, deviceId}],  // Store player with device ID
+      players: [{nickname, deviceId, socketId: socket.id}],  // Store player with device ID and socket ID
       chess: new Chess(),
       started: false,
       moves: []
@@ -64,6 +64,8 @@ io.on('connection', (socket) => {
   
   // Handle joining an existing game
   socket.on('join_game', ({ gameId, nickname, deviceId }) => {
+    console.log(`Player attempting to join: ${gameId} as ${nickname} (device: ${deviceId})`);
+    
     const game = games.get(gameId);
     
     if (!game) {
@@ -73,11 +75,7 @@ io.on('connection', (socket) => {
     
     // Check if this device is already in the game
     const deviceAlreadyInGame = game.players.some(p => p.deviceId === deviceId);
-    
-    if (game.players.length >= 2 && !deviceAlreadyInGame) {
-      socket.emit('error', { message: 'Game is full' });
-      return;
-    }
+    const uniqueDevices = new Set(game.players.map(p => p.deviceId));
     
     // Store this socket's info
     socket.data.deviceId = deviceId;
@@ -93,19 +91,39 @@ io.on('connection', (socket) => {
     
     console.log(`Player ${nickname} (device: ${deviceId}) joined game ${gameId}`);
     
-    // Only add the player if their device isn't already in the game
-    if (!deviceAlreadyInGame) {
-      // Add player to the game
-      game.players.push({nickname, deviceId});
+    // Check if game has capacity for this player
+    if (game.players.length >= 2 && !deviceAlreadyInGame) {
+      socket.emit('error', { message: 'Game is full' });
+      return;
     }
     
     // Join the socket to the game room
     socket.join(gameId);
     
+    // Only add the player if their device isn't already in the game
+    if (!deviceAlreadyInGame) {
+      // Add player to the game
+      game.players.push({nickname, deviceId, socketId: socket.id});
+    }
+    
     // Notify everyone in the room about the players
     io.to(gameId).emit('player_joined', { 
       players: game.players.map(p => p.nickname) 
     });
+    
+    // If there are now 2 unique devices in the game, auto-start after a delay
+    // This gives both clients time to process the player_joined event
+    const updatedUniqueDevices = new Set(game.players.map(p => p.deviceId));
+    if (updatedUniqueDevices.size >= 2 && !game.started) {
+      console.log(`Game ${gameId} has 2 unique devices, auto-starting in 1 second...`);
+      setTimeout(() => {
+        if (!game.started) {
+          game.started = true;
+          io.to(gameId).emit('game_start');
+          console.log(`Game ${gameId} auto-started!`);
+        }
+      }, 1000);
+    }
   });
   
   // Handle starting a game
@@ -121,7 +139,7 @@ io.on('connection', (socket) => {
       return;
     }
     
-    console.log(`Game ${gameId} started`);
+    console.log(`Game ${gameId} started manually`);
     
     game.started = true;
     
