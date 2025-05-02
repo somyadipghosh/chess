@@ -134,7 +134,16 @@ export const GameProvider = ({ children }) => {
   // Handle player move
   const makeMove = (move) => {
     if (socket) {
-      socket.emit('make_move', { gameId, move, player: nickname, deviceId });
+      console.log('Making move:', move, 'as', playerColor);
+      // Make sure we always send the FEN position with the move
+      socket.emit('make_move', { 
+        gameId, 
+        move,
+        player: nickname, 
+        deviceId,
+        notation: move.notation,
+        fen: move.fen // Ensure FEN is always sent for proper synchronization
+      });
     }
   };
 

@@ -157,8 +157,9 @@ const Game = () => {
       // Add move to history
       setMoveHistory(prev => [...prev, notation]);
       
-      // Store the latest FEN position
+      // Always store the latest FEN position from the server
       if (fen) {
+        console.log("Updating board FEN:", fen);
         setLastFen(fen);
       }
     });
