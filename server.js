@@ -295,11 +295,12 @@ io.on('connection', (socket) => {
           players: game.players.map(p => p.nickname)
         });
         
-        // If the game had already started, end it
+        // If the game had already started, end it and award victory to the remaining player
         if (game.started) {
+          const remainingPlayer = game.players[0].nickname;
           io.to(gameId).emit('game_over', { 
-            result: `${nickname} resigned`,
-            reason: 'Player left the game'
+            result: `${remainingPlayer} wins`,
+            reason: `${nickname} left the game - Victory awarded to ${remainingPlayer}`
           });
         }
       } else {

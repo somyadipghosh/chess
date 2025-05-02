@@ -16,6 +16,7 @@ export const GameProvider = ({ children }) => {
   const [playerColor, setPlayerColor] = useState('');
   const [readyPlayers, setReadyPlayers] = useState([]);
   const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState('');
   // Add a unique device ID to distinguish different devices
   const [deviceId] = useState(() => {
     // Try to get existing device ID from local storage
@@ -53,6 +54,8 @@ export const GameProvider = ({ children }) => {
     socket.on('player_joined', ({ players: gamePlayers }) => {
       console.log('Player joined event received:', gamePlayers);
       setPlayers(gamePlayers);
+      // Clear any previous errors when successfully joining a game
+      setError('');
     });
 
     // Listen for player ready status
@@ -66,12 +69,33 @@ export const GameProvider = ({ children }) => {
       console.log('Game has started!');
       setGameStarted(true);
     });
+    
+    // Listen for error messages from server
+    socket.on('error', ({ message }) => {
+      console.log('Error received:', message);
+      setError(message);
+    });
+    
+    // Listen for player left event
+    socket.on('player_left', ({ player, players: remainingPlayers }) => {
+      console.log(`Player ${player} left the game`);
+      setPlayers(remainingPlayers);
+    });
+    
+    // Listen for game over event
+    socket.on('game_over', ({ result, reason }) => {
+      console.log(`Game over: ${result}. ${reason}`);
+      // Game over will be handled in the Game component
+    });
 
     // Cleanup listener when component unmounts
     return () => {
       socket.off('player_joined');
       socket.off('player_ready');
       socket.off('game_start');
+      socket.off('error');
+      socket.off('player_left');
+      socket.off('game_over');
     };
   }, [socket]);
 
@@ -91,6 +115,7 @@ export const GameProvider = ({ children }) => {
   const joinGame = (gameIdToJoin) => {
     if (socket) {
       console.log('Joining game:', gameIdToJoin, 'as', nickname);
+      setError(''); // Clear any previous errors
       socket.emit('join_game', { gameId: gameIdToJoin, nickname, deviceId });
       setGameId(gameIdToJoin);
       setPlayerColor('black');
@@ -111,6 +136,18 @@ export const GameProvider = ({ children }) => {
     if (socket) {
       socket.emit('make_move', { gameId, move, player: nickname, deviceId });
     }
+  };
+
+  // Clear game state (for when returning to home or after errors)
+  const clearGameState = () => {
+    setGameId('');
+    setPlayers([]);
+    setCurrentPlayer('');
+    setGameStarted(false);
+    setPlayerColor('');
+    setReadyPlayers([]);
+    setIsReady(false);
+    setError('');
   };
 
   // Game state values and functions
@@ -134,7 +171,10 @@ export const GameProvider = ({ children }) => {
     createGame,
     joinGame,
     makeMove,
-    deviceId
+    deviceId,
+    error,
+    setError,
+    clearGameState
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

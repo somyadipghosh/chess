@@ -21,7 +21,9 @@ const Game = () => {
     gameStarted,
     setGameStarted,
     playerColor,
-    deviceId
+    deviceId,
+    error,
+    setError
   } = useGame();
   
   const [waitingForOpponent, setWaitingForOpponent] = useState(true);
@@ -30,6 +32,7 @@ const Game = () => {
   const [copied, setCopied] = useState(false);
   const [moveHistory, setMoveHistory] = useState([]);
   const [lastFen, setLastFen] = useState(null); // Store the latest FEN position
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   useEffect(() => {
     // Set game ID from the route parameter
@@ -42,6 +45,13 @@ const Game = () => {
       navigate('/');
     }
   }, [routeGameId, gameId, nickname, navigate, setGameId]);
+
+  // Show error modal if there's an error
+  useEffect(() => {
+    if (error) {
+      setShowErrorModal(true);
+    }
+  }, [error]);
 
   // Join game when we have all the necessary info
   useEffect(() => {
@@ -102,6 +112,18 @@ const Game = () => {
       }
     });
 
+    // Listen for player leaving the game
+    socket.on('player_left', ({ player, players: remainingPlayers }) => {
+      console.log(`Player ${player} left the game`);
+      setPlayers(remainingPlayers);
+      
+      if (!gameStarted) {
+        setMessage(`${player} left the game. Waiting for new opponent...`);
+        setWaitingForOpponent(true);
+        setGameStatus('waiting');
+      }
+    });
+
     // Listen for player ready status updates
     socket.on('player_ready', ({ readyPlayers: gameReadyPlayers }) => {
       console.log("Ready players updated:", gameReadyPlayers);
@@ -116,6 +138,7 @@ const Game = () => {
 
     // Listen for errors
     socket.on('error', ({ message }) => {
+      setError(message);
       setMessage(`Error: ${message}`);
     });
 
@@ -149,13 +172,14 @@ const Game = () => {
     // Cleanup listeners on component unmount
     return () => {
       socket.off('player_joined');
+      socket.off('player_left');
       socket.off('player_ready');
       socket.off('error');
       socket.off('game_start');
       socket.off('game_move');
       socket.off('game_over');
     };
-  }, [socket, players, setPlayers, gameStarted, setGameStarted]);
+  }, [socket, players, setPlayers, gameStarted, setGameStarted, setError]);
 
   // Copy game code to clipboard
   const copyGameCode = () => {
@@ -179,8 +203,35 @@ const Game = () => {
     navigate('/');
   };
 
+  const handleErrorModalClose = () => {
+    setShowErrorModal(false);
+    setError('');
+    navigate('/');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-secondary-950 to-secondary-900 text-white p-4 md:p-6">
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-secondary-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl border border-secondary-700">
+            <div className="text-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-red-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h2 className="text-xl font-bold mt-2">Error</h2>
+            </div>
+            <p className="text-center mb-4">{error}</p>
+            <button
+              onClick={handleErrorModalClose}
+              className="w-full py-2 px-4 bg-primary-600 hover:bg-primary-700 rounded-lg font-medium transition-all"
+            >
+              Back to Home
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
         {/* Header with game title and game code */}
         <div className="mb-6">

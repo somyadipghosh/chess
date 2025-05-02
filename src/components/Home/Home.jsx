@@ -1,21 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../../context/GameContext';
 
 const Home = () => {
   const navigate = useNavigate();
-  const { nickname, setNickname, createGame, joinGame } = useGame();
+  const { nickname, setNickname, createGame, joinGame, error, clearGameState } = useGame();
   const [gameIdInput, setGameIdInput] = useState('');
   const [step, setStep] = useState(1); // 1: Enter nickname, 2: Create/Join game
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
+
+  // Clear any previous game state when returning to home
+  useEffect(() => {
+    clearGameState();
+  }, [clearGameState]);
+
+  // Show server errors if they exist
+  useEffect(() => {
+    if (error) {
+      setLocalError(error);
+    }
+  }, [error]);
 
   const handleSubmitNickname = (e) => {
     e.preventDefault();
     if (nickname.trim()) {
       setStep(2);
-      setError('');
+      setLocalError('');
     } else {
-      setError('Please enter a nickname');
+      setLocalError('Please enter a nickname');
     }
   };
 
@@ -28,9 +40,15 @@ const Home = () => {
     e.preventDefault();
     if (gameIdInput.trim()) {
       joinGame(gameIdInput.trim());
-      navigate(`/game/${gameIdInput.trim()}`);
+      // Navigate after a short delay to allow error to be received if the game doesn't exist
+      setTimeout(() => {
+        // Only navigate if there's no error
+        if (!error) {
+          navigate(`/game/${gameIdInput.trim()}`);
+        }
+      }, 300);
     } else {
-      setError('Please enter a valid game code');
+      setLocalError('Please enter a valid game code');
     }
   };
 
@@ -71,7 +89,11 @@ const Home = () => {
                   placeholder="Enter your nickname"
                 />
               </div>
-              {error && <p className="text-red-400 text-sm font-medium">{error}</p>}
+              {localError && (
+                <div className="bg-red-900/40 border border-red-800 text-red-200 px-4 py-3 rounded-lg">
+                  <p>{localError}</p>
+                </div>
+              )}
               <div>
                 <button
                   type="submit"
@@ -126,7 +148,13 @@ const Home = () => {
                     placeholder="Enter game code"
                   />
                 </div>
-                {error && <p className="text-red-400 text-sm font-medium">{error}</p>}
+                
+                {localError && (
+                  <div className="bg-red-900/40 border border-red-800 text-red-200 px-4 py-3 rounded-lg">
+                    <p>{localError}</p>
+                  </div>
+                )}
+                
                 <div>
                   <button
                     type="submit"
