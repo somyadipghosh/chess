@@ -28,6 +28,26 @@ export const GameProvider = ({ children }) => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!socket) return;
+
+    // Listen for player joined events
+    socket.on('player_joined', ({ players: gamePlayers }) => {
+      setPlayers(gamePlayers);
+      
+      // If there are 2 or more players and the current player is host (white),
+      // automatically start the game
+      if (gamePlayers.length >= 2 && playerColor === 'white' && gameId) {
+        socket.emit('start_game', { gameId });
+      }
+    });
+
+    // Cleanup listener when component unmounts
+    return () => {
+      socket.off('player_joined');
+    };
+  }, [socket, playerColor, gameId]);
+
   // Generate a new game ID
   const createGame = () => {
     const newGameId = uuidv4().substring(0, 6);
